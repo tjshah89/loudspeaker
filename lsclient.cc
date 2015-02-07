@@ -24,26 +24,13 @@ int main( int argc, char *argv[] )
     FILE *fd; 
     fd = fopen(argv[3], "w");
 
-    /* check the command-line arguments */
-    if ( argc < 1 ) { /* for sticklers */
-	abort();
-    }
-
 
     string host { argv[ 1 ] }, port { argv[ 2 ] };
-
-    /* Look up the server's address */
-    cerr << "Looking up " << host << ":" << port << endl;
     Address server( host, port );
-    cerr << "Done. Found " << server.to_string() << endl;
 
-    /* create a TCP socket */
+
     TCPSocket socket;
-
-    /* connect to the server */
-    cerr << "Connecting...";
     socket.connect( server );
-    cerr << "done." << endl;
 
     /* now read and write from the server using an event-driven "poller" */
     Poller poller;
@@ -61,15 +48,6 @@ int main( int argc, char *argv[] )
 				   } else {
 				       return ResultType::Continue;
 				   }
-			       } ) );
-
-    /* second rule: if the keyboard has data ready (also in the "In" direction),
-       write it to the server, plus a carriage return and newline */
-    FileDescriptor keyboard( 0 );
-    poller.add_action( Action( keyboard, Direction::In,
-			       [&] () {
-				   socket.write( keyboard.read() + "\r\n" );
-				   return ResultType::Continue;
 			       } ) );
 
     /* run these two rules forever until it's time to quit */
