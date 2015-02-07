@@ -1,54 +1,84 @@
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <iostream>
+#include <thread>
 
-#include <pulse/simple.h>
+#include "socket.hh"
+#include "util.hh"
+#include "poller.hh"
 
+#define BUFSIZE 256
 
-#define BUFSIZE 1024
+using namespace std;
+using namespace PollerShortNames;
 
-
-int main(int argc, char* argv[]) {
-
-    static const pa_sample_spec ss = {
-	.format = PA_SAMPLE_S16LE,
-	.rate = 44100, 
-	.channels = 2
-    };
-
-    pa_simple *s = NULL;
-    int ret = 1;
-    int error;
-
-    if (argc > 1) {
-	int fd; 
-	fd = open(argv[1], O_RDONLY);
-	dup2(fd, STDIN_FILENO);
-	close(fd);
-    }	
-
-
-    s = pa_simple_new(NULL, argv[0], PA_STREAM_PLAYBACK, NULL, "playback", &ss, NULL, NULL, &error);
-
-    for (;;) {
-	uint8_t buf[BUFSIZE];
-	pa_usec_t latency;
-	ssize_t r;
-
-	r = read(STDIN_FILENO, buf, sizeof(buf));
-	if (r == 0) 
-	    break;
-	
-	pa_simple_write(s, buf, (size_t) r, &error);
+int main( int argc, char *argv[] )
+{
+    if ( argc != 4 ) {
+	cerr << "Usage: " << argv[ 0 ] << " HOST PORT outfile" << endl;
+	return EXIT_FAILURE;
     }
-    
-    pa_simple_drain(s, &error);
-    ret = 0;
 
-    if (s)
-	pa_simple_free(s);
-    
-    return ret;
+    FILE *fd; 
+    fd = fopen(argv[3], "w");
+
+    /* check the command-line arguments */
+    if ( argc < 1 ) { /* for sticklers */
+	abort();
+    }
+
+
+    string host { argv[ 1 ] }, port { argv[ 2 ] };
+
+    /* Look up the server's address */
+    cerr << "Looking up " << host << ":" << port << endl;
+    Address server( host, port );
+    cerr << "Done. Found " << server.to_string() << endl;
+
+    /* create a TCP socket */
+    TCPSocket socket;
+
+    /* connect to the server */
+    cerr << "Connecting...";
+    socket.connect( server );
+    cerr << "done." << endl;
+
+    /* now read and write from the server using an event-driven "poller" */
+    Poller poller;
+
+    /* first rule: if the socket has data ready (in the "In" direction),
+       print it to the screen (cout) */
+    poller.add_action( Action( socket, Direction::In,
+			       [&] () {
+				   const char *c = socket.read().c_str();
+				   fprintf(fd, c);
+
+				   /* exit if the server closes the connection */
+				   if ( socket.eof() ) {
+				       return ResultType::Exit;
+				   } else {
+				       return ResultType::Continue;
+				   }
+			       } ) );
+
+    /* second rule: if the keyboard has data ready (also in the "In" direction),
+       write it to the server, plus a carriage return and newline */
+    FileDescriptor keyboard( 0 );
+    poller.add_action( Action( keyboard, Direction::In,
+			       [&] () {
+				   socket.write( keyboard.read() + "\r\n" );
+				   return ResultType::Continue;
+			       } ) );
+
+    /* run these two rules forever until it's time to quit */
+    while ( true ) {
+	const auto ret = poller.poll( -1 );
+	if ( ret.result == PollResult::Exit ) {
+	    return ret.exit_status;
+	}
+    }
+
+    fclose(fd);
 }
-     
-     

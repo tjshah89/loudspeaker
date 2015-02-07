@@ -6,7 +6,7 @@ SOURDOUGH =  sourdough/src/libsourdough.a
 all: parec-simple pacat-simple patest lsclient lsserver 
 
 lsclient: lsclient.cc
-	$(CC) -o lsclient lsclient.cc $(CFLAGS) $(LIBS)
+	$(CC) -o lsclient lsclient.cc $(CFLAGS) $(LIBS) $(SOURDOUGH)
 
 lsserver: lsserver.cc
 	$(CC) -o lsserver lsserver.cc $(CFLAGS) $(LIBS) $(SOURDOUGH)
