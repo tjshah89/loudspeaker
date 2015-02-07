@@ -5,11 +5,11 @@
 #include <iostream>
 
 #include <pulse/simple.h>
-#include "socket.hh"
-#include "util.hh"
+#include "src/socket.hh"
+#include "src/util.hh"
 
 
-#define BUFSIZE 1024
+#define BUFSIZE 256
 
 
 int main(int argc, char* argv[]) {
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 	   it starts a thread to handle that client and passes in the
 	   result of accept() as the "client" parameter to the handler. */
 
-	thread client_handler( [] ( TCPSocket client ) {
+	std::thread client_handler( [] ( TCPSocket client ) {
 
 		for (;;) {
 		    uint8_t buf[BUFSIZE];
@@ -45,9 +45,9 @@ int main(int argc, char* argv[]) {
 		    if (r == 0) 
 			break;
 		    
-		    client.write(buf);
+		    client.write("hello\n");
 		}
-		client.write("Close");
+		client.write("Close\n");
 	    }, listening_socket.accept() );
 
 	/* Let the client handler continue to run without having

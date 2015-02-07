@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS= -lpulse -lpulse-simple -pthread -I ./sourdough/src -std=c++11
+CFLAGS= -lpulse -lpulse-simple -pthread -I ./sourdough -std=c++11 -L ./sourdough/src/ -L sourdough/src/libsourdough.a
 
 all: parec-simple pacat-simple patest lsclient lsserver 
 
