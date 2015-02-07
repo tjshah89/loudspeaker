@@ -1,22 +1,24 @@
 CC=g++
-CFLAGS= -lpulse -lpulse-simple -pthread -I ./sourdough -std=c++11 -L ./sourdough/src/ -L sourdough/src/libsourdough.a
+CFLAGS= -std=c++11 -I sourdough/src/ 
+LIBS = -lpulse -lpulse-simple -lpthread -L sourdough/src/
+SOURDOUGH =  sourdough/src/libsourdough.a
 
 all: parec-simple pacat-simple patest lsclient lsserver 
 
 lsclient: lsclient.cc
-	$(CC) -o lsclient lsclient.cc $(CFLAGS)
+	$(CC) -o lsclient lsclient.cc $(CFLAGS) $(LIBS)
 
 lsserver: lsserver.cc
-	$(CC) -o lsserver lsserver.cc $(CFLAGS)
+	$(CC) -o lsserver lsserver.cc $(CFLAGS) $(LIBS) $(SOURDOUGH)
 
 patest: patest.cc
-	$(CC) -o patest patest.cc $(CFLAGS)
+	$(CC) -o patest patest.cc $(CFLAGS) $(LIBS)
 
 parec-simple: parec-simple.cc
-	$(CC) -o parec-simple parec-simple.cc $(CFLAGS)
+	$(CC) -o parec-simple parec-simple.cc $(CFLAGS) $(LIBS)
 
 pacat-simple: pacat-simple.cc
-	$(CC) -o pacat-simple pacat-simple.cc $(CFLAGS)
+	$(CC) -o pacat-simple pacat-simple.cc $(CFLAGS) $(LIBS)
 
 clean:
 	rm -f *.o *~ core parec-simple pacat-simple patest lsserver lsclient

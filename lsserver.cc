@@ -5,8 +5,8 @@
 #include <iostream>
 
 #include <pulse/simple.h>
-#include "src/socket.hh"
-#include "src/util.hh"
+#include "socket.hh"
+#include "util.hh"
 
 
 #define BUFSIZE 256
