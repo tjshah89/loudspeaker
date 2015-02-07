@@ -1,24 +1,18 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <thread>
+#include <iostream>
 
 #include <pulse/simple.h>
+#include "socket.hh"
+#include "util.hh"
 
 
 #define BUFSIZE 1024
 
 
 int main(int argc, char* argv[]) {
-
-    static const pa_sample_spec ss = {
-	.format = PA_SAMPLE_S16LE,
-	.rate = 44100, 
-	.channels = 1
-    };
-
-    pa_simple *s = NULL;
-    int ret = 1;
-    int error;
 
     if (argc > 1) {
 	int fd; 
@@ -27,28 +21,43 @@ int main(int argc, char* argv[]) {
 	close(fd);
     }	
 
+    TCPSocket listening_socket;
+    listening_socket.bind( Address( "::0", argv[ 1 ] ) );
 
-    s = pa_simple_new(NULL, argv[0], PA_STREAM_PLAYBACK, NULL, "playback", &ss, NULL, NULL, &error);
+    listening_socket.listen();
 
-    for (;;) {
-	uint8_t buf[BUFSIZE];
-	pa_usec_t latency;
-	ssize_t r;
+    /* Wait for clients to connect */
+    while ( true ) {
 
-	r = read(STDIN_FILENO, buf, sizeof(buf));
-	if (r == 0) 
-	    break;
+	/* This line does a lot. It waits for a client to connect
+	   ("listening_socket.accept()"). When that returns a new socket,
+	   it starts a thread to handle that client and passes in the
+	   result of accept() as the "client" parameter to the handler. */
+
+	thread client_handler( [] ( TCPSocket client ) {
+
+		for (;;) {
+		    uint8_t buf[BUFSIZE];
+		    pa_usec_t latency;
+		    ssize_t r;
+		    
+		    r = read(STDIN_FILENO, buf, sizeof(buf));
+		    if (r == 0) 
+			break;
+		    
+		    client.write(buf);
+		}
+		client.write("Close");
+	    }, listening_socket.accept() );
+
+	/* Let the client handler continue to run without having
+	   to keep track of it. The main thread can go back to accepting
+	   new incoming connections. */
 	
-	pa_simple_write(s, buf, (size_t) r, &error);
+	client_handler.detach();
     }
-    
-    pa_simple_drain(s, &error);
-    ret = 0;
 
-    if (s)
-	pa_simple_free(s);
-    
-    return ret;
+    return EXIT_SUCCESS;
 }
      
      

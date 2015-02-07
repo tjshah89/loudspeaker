@@ -1,7 +1,7 @@
 CC=g++
-CFLAGS=-I -lpulse -lpulse-simple
+CFLAGS= -lpulse -lpulse-simple -pthread -I ./sourdough/src -std=c++11
 
-all: parec-simple pacat-simple patest lsclient lsserver
+all: parec-simple pacat-simple patest lsclient lsserver 
 
 lsclient: lsclient.cc
 	$(CC) -o lsclient lsclient.cc $(CFLAGS)
