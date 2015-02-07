@@ -55,7 +55,7 @@ int main(int argc, char*argv[]) {
 	/* Create the recording stream */
 	if (!(s = pa_simple_new(NULL, argv[0], PA_STREAM_RECORD, NULL, "record", &ss, NULL, NULL, &error))) {
 		fprintf(stderr, __FILE__": pa_simple_new() failed: %s\n", pa_strerror(error));
-		goto finish;
+		return ret;
 	}
 	int filedesc = open("outfile", O_WRONLY);
 
@@ -64,18 +64,17 @@ int main(int argc, char*argv[]) {
 		/* Record some data ... */
 		if (pa_simple_read(s, buf, sizeof(buf), &error) < 0) {
 			fprintf(stderr, __FILE__": pa_simple_read() failed: %s\n", pa_strerror(error));
-			goto finish;
+			break;
 		}
 		/* And write it to STDOUT */
 		if (loop_write(filedesc, buf, sizeof(buf)) != sizeof(buf)) {
 			fprintf(stderr, __FILE__": write() failed: %s\n", strerror(errno));
-			goto finish;
+			break;
 		}
 	}
 	
 	close(filedesc);
 	ret = 0;
-finish:
 	if (s)
 		pa_simple_free(s);
 	return ret;

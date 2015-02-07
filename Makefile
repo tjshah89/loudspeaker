@@ -1,22 +1,22 @@
-CC=gcc
+CC=g++
 CFLAGS=-I -lpulse -lpulse-simple
 
 all: parec-simple pacat-simple patest lsclient lsserver
 
-lsclient: lsclient.c
-	$(CC) -o lsclient lsclient.c $(CFLAGS)
+lsclient: lsclient.cc
+	$(CC) -o lsclient lsclient.cc $(CFLAGS)
 
-lsserver: lsserver.c
-	$(CC) -o lsserver lsserver.c $(CFLAGS)
+lsserver: lsserver.cc
+	$(CC) -o lsserver lsserver.cc $(CFLAGS)
 
-patest: patest.c
-	$(CC) -o patest patest.c $(CFLAGS)
+patest: patest.cc
+	$(CC) -o patest patest.cc $(CFLAGS)
 
-parec-simple: parec-simple.c
-	$(CC) -o parec-simple parec-simple.c $(CFLAGS)
+parec-simple: parec-simple.cc
+	$(CC) -o parec-simple parec-simple.cc $(CFLAGS)
 
-pacat-simple: pacat-simple.c
-	$(CC) -o pacat-simple pacat-simple.c $(CFLAGS)
+pacat-simple: pacat-simple.cc
+	$(CC) -o pacat-simple pacat-simple.cc $(CFLAGS)
 
 clean:
 	rm -f *.o *~ core parec-simple pacat-simple patest lsserver lsclient
