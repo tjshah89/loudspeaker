@@ -22,7 +22,7 @@ int main( int argc, char *argv[] )
     }
 
     FILE *fd; 
-    fd = fopen(argv[3], "w");
+    fd = fopen(argv[3], "wb");
 
 
     string host { argv[ 1 ] }, port { argv[ 2 ] };
@@ -40,7 +40,7 @@ int main( int argc, char *argv[] )
     poller.add_action( Action( socket, Direction::In,
 			       [&] () {
 				   const char *c = socket.read().c_str();
-				   fprintf(fd, c);
+				   fwrite(c, sizeof(char), BUFSIZE, fd);
 
 				   /* exit if the server closes the connection */
 				   if ( socket.eof() ) {
