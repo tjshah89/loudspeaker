@@ -27,21 +27,6 @@
 #include <fcntl.h>
 
 #define BUFSIZE 1024
-/* A simple routine calling UNIX write() in a loop */
-static ssize_t loop_write(int fd, const void*data, size_t size) {
-	ssize_t ret = 0;
-	while (size > 0) {
-		ssize_t r;
-		if ((r = write(fd, data, size)) < 0)
-			return r;
-		if (r == 0)
-			break;
-		ret += r;
-		data = (const uint8_t*) data + r;
-		size -= (size_t) r;
-	}
-	return ret;
-}
 int main(int argc, char*argv[]) {
 	/* The sample type to use */
 	static const pa_sample_spec ss = {
@@ -57,7 +42,7 @@ int main(int argc, char*argv[]) {
 		fprintf(stderr, __FILE__": pa_simple_new() failed: %s\n", pa_strerror(error));
 		return ret;
 	}
-	int filedesc = open("outfile", O_WRONLY);
+	FILE *filedesc = fopen("outfile.raw", "w");
 
 	for (;;) {
 		uint8_t buf[BUFSIZE];
@@ -66,14 +51,12 @@ int main(int argc, char*argv[]) {
 			fprintf(stderr, __FILE__": pa_simple_read() failed: %s\n", pa_strerror(error));
 			break;
 		}
-		/* And write it to STDOUT */
-		if (loop_write(filedesc, buf, sizeof(buf)) != sizeof(buf)) {
-			fprintf(stderr, __FILE__": write() failed: %s\n", strerror(errno));
-			break;
-		}
+
+		/* And write it to a file */
+		fwrite(buf, sizeof(buf[0]), BUFSIZE, filedesc);
 	}
 	
-	close(filedesc);
+	fclose(filedesc);
 	ret = 0;
 	if (s)
 		pa_simple_free(s);
