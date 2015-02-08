@@ -19,11 +19,8 @@ int main(int argc, char* argv[]) {
 
     
     printf("Opening audio file...\n");
-    int fd; 
-    fd = open(argv[2], O_RDONLY);
-    dup2(fd, STDIN_FILENO);
-    close(fd);
-
+    FILE* fd; 
+    fd = fopen(argv[2], "rb");
 
     printf("Creating listening socket...\n");
     TCPSocket listening_socket;
@@ -41,7 +38,7 @@ int main(int argc, char* argv[]) {
 	   it starts a thread to handle that client and passes in the
 	   result of accept() as the "client" parameter to the handler. */
 	
-	std::thread client_handler( [] ( TCPSocket client ) {
+	std::thread client_handler( [fd] ( TCPSocket client ) {
 		int byte = 0;
 		
 		for (;;) {
@@ -51,13 +48,14 @@ int main(int argc, char* argv[]) {
 		    pa_usec_t latency;
 		    ssize_t r;
 		    
-		    r = read(STDIN_FILENO, (uint8_t*)buf, sizeof(buf));
+		    r = fread((uint8_t*)buf, sizeof(buf[0]), BUFSIZE, fd);
 		    if (r == 0) 
 			break;
 		    
 		    client.write(buf);
 		    byte += BUFSIZE;
 		}
+		printf("Closing connection...\n");
 
 		client.write("Close\n");
 	    }, listening_socket.accept() );
@@ -70,6 +68,7 @@ int main(int argc, char* argv[]) {
 	client_handler.detach();
     }
 
+    fclose(fd);
     return EXIT_SUCCESS;
 }
      

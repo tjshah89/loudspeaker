@@ -39,8 +39,8 @@ int main( int argc, char *argv[] )
        print it to the screen (cout) */
     poller.add_action( Action( socket, Direction::In,
 			       [&] () {
-				   const char *c = socket.read().c_str();
-				   fwrite(c, sizeof(char), BUFSIZE, fd);
+				   uint8_t* buf = (uint8_t*)socket.read().c_str();
+				   fwrite(buf, sizeof(buf[0]), BUFSIZE, fd);
 
 				   /* exit if the server closes the connection */
 				   if ( socket.eof() ) {
