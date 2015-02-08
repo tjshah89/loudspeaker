@@ -1,0 +1,21 @@
+to record from your speaker:
+
+run:
+$ pacmd list-sources
+
+find the index, i, of the 'output' source
+
+$ pacmd set-default-source i
+
+Now, open a new terminal and run 
+$ aplay -c2 -r44100 -f S16_LE audio/thrift.raw
+
+in the original terminal run
+
+$ ./parec-simple 
+
+When you're done recording, kill parec and run
+
+$ aplay -c2 -r44100 -f S16_LE output.raw
+
+This should play what parec just recorded and wrote out. 
