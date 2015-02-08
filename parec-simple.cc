@@ -42,7 +42,7 @@ int main(int argc, char*argv[]) {
 		fprintf(stderr, __FILE__": pa_simple_new() failed: %s\n", pa_strerror(error));
 		return ret;
 	}
-	FILE *filedesc = fopen("outfile.raw", "w");
+	FILE *filedesc = fopen("outfile.raw", "wb");
 
 	for (;;) {
 		uint8_t buf[BUFSIZE];
