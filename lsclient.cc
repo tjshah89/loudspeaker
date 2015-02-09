@@ -51,8 +51,8 @@ int main( int argc, char *argv[] )
     poller.add_action( Action( socket, Direction::In,
 			       [&] () {
 				   pair<Address, string> p = socket.recvfrom();
-				   uint8_t* buf = (uint8_t*)p.second.c_str();
-				   fwrite(buf, sizeof(buf[0]), BUFSIZE, fd);
+				   char* buf = (char*)p.second.data();
+				   fwrite(buf, sizeof(char), BUFSIZE, fd);
 				   //pa_simple_write(s, buf, (size_t) BUFSIZE, &error);
 				   /* exit if the server closes the connection */
 				   if ( socket.eof() ) {

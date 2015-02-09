@@ -48,11 +48,11 @@ int main(int argc, char* argv[]) {
 	    pa_usec_t latency;
 	    ssize_t r;
 	    
-	    r = fread((uint8_t*)buf, sizeof(buf[0]), BUFSIZE, fd);
+	    r = fread((char*)buf, sizeof(char), BUFSIZE, fd);
 	    if (r == 0) 
 		break;
 	    
-	    listening_socket.sendto(p.first,buf);
+	    listening_socket.sendto(p.first, string(buf, BUFSIZE));
 	    byte += 1;
 	}
 	printf("Closing connection...\n");
