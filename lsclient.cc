@@ -5,6 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <pulse/simple.h>
+#include <vector>
 
 #include "socket.hh"
 #include "util.hh"
@@ -39,6 +40,7 @@ int main( int argc, char *argv[] )
     string host { argv[ 1 ] }, port { argv[ 2 ] };
     Address server( host, port );
 
+    vector<string> audioBuffer;
 
     UDPSocket socket;
     socket.connect( server );
@@ -49,31 +51,40 @@ int main( int argc, char *argv[] )
     /* first rule: if the socket has data ready (in the "In" direction),
        print it to the screen (cout) */
     poller.add_action( Action( socket, Direction::In,
-			       [&] () {
+			     [&] () {
 				   pair<Address, string> p = socket.recvfrom();
-				   char* buf = (char*)p.second.data();
-				   fwrite(buf, sizeof(char), BUFSIZE, fd);
-				   //pa_simple_write(s, buf, (size_t) BUFSIZE, &error);
 				   /* exit if the server closes the connection */
-				   if ( socket.eof() ) {
+				   if (p.second == "eof") {
 				       return ResultType::Exit;
 				   } else {
+					   audioBuffer.push_back(p.second);
+					   char* buf = (char*)p.second.data();
+					   fwrite(buf, sizeof(char), BUFSIZE, fd);
+					   //pa_simple_write(s, buf, (size_t) BUFSIZE, &error);
 				       return ResultType::Continue;
 				   }
-			       } ) );
+			     } ) );
 
-
+    int i = 0;    
     /* run these two rules forever until it's time to quit */
     while ( true ) {
-	const auto ret = poller.poll( -1 );
-	if ( ret.result == PollResult::Exit ) {
-	    pa_simple_drain(s, &error);
-	    
-	    if (s)
-		pa_simple_free(s);
-	    
-	    return ret.exit_status;
-	}
+		const auto ret = poller.poll( -1 );
+
+		if ( ret.result == PollResult::Exit ) {
+			cout << "reached end " << audioBuffer.size() << endl;
+			for (int i = 0; i < audioBuffer.size(); i++) {
+				string audioChunk = audioBuffer.at(i);
+				char* buf = (char*)audioChunk.data();
+				pa_simple_write(s, buf, (size_t) BUFSIZE, &error);
+	  		}	
+
+			pa_simple_drain(s, &error);
+			
+			if (s)
+				pa_simple_free(s);
+			
+			return ret.exit_status;
+		}
     }
 
     fclose(fd);
