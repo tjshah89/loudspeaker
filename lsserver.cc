@@ -10,6 +10,7 @@
 
 
 #define BUFSIZE 256
+using namespace std;
 
 
 int main(int argc, char* argv[]) {
@@ -23,49 +24,40 @@ int main(int argc, char* argv[]) {
     fd = fopen(argv[2], "rb");
 
     printf("Creating listening socket...\n");
-    TCPSocket listening_socket;
+    UDPSocket listening_socket;
     listening_socket.bind( Address( "::0", argv[ 1 ] ) );
-
-    listening_socket.listen();
 
 
     /* Wait for clients to connect */
     while ( true ) {
 	printf("Waiting for clients...\n");
-    
 	/* This line does a lot. It waits for a client to connect
 	   ("listening_socket.accept()"). When that returns a new socket,
 	   it starts a thread to handle that client and passes in the
 	   result of accept() as the "client" parameter to the handler. */
 	
-	std::thread client_handler( [fd] ( TCPSocket client ) {
-		int byte = 0;
-		
-		for (;;) {
-		    printf("Sending audio byte %d...\n", byte);
+	pair<Address, string> p = listening_socket.recvfrom();
 
-		    char buf[BUFSIZE];
-		    pa_usec_t latency;
-		    ssize_t r;
-		    
-		    r = fread((uint8_t*)buf, sizeof(buf[0]), BUFSIZE, fd);
-		    if (r == 0) 
-			break;
-		    
-		    client.write(buf);
-		    byte += BUFSIZE;
-		}
-		printf("Closing connection...\n");
-
-		client.write("Close\n");
-	    }, listening_socket.accept() );
-
-	/* Let the client handler continue to run without having
-	   to keep track of it. The main thread can go back to accepting
-	   new incoming connections. */
-	printf("Waiting for clients...\n");
+	printf("Got connection:%s\n", p.second.c_str());
+	int byte = 0;
 	
-	client_handler.detach();
+	for (;;) {
+	    printf("Sending audio byte %d...\n", byte);
+	    
+	    char buf[BUFSIZE];
+	    pa_usec_t latency;
+	    ssize_t r;
+	    
+	    r = fread((uint8_t*)buf, sizeof(buf[0]), BUFSIZE, fd);
+	    if (r == 0) 
+		break;
+	    
+	    listening_socket.sendto(p.first,buf);
+	    byte += 1;
+	}
+	printf("Closing connection...\n");
+	listening_socket.sendto(p.first, "eof");
+
     }
 
     fclose(fd);
