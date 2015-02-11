@@ -15,10 +15,13 @@ using namespace std;
 
 int main(int argc, char* argv[]) {
 
-    if (argc < 3) 
-	printf("Usage: ./lsserver <localport> <raw audio file>");
+    if (argc < 3) {
+	printf("Usage: ./lsserver <localport> <raw audio file>\n");
+	return 0;
+    }
 
-    
+    srand(time(NULL));
+
     printf("Opening audio file...\n");
     FILE* fd; 
     fd = fopen(argv[2], "rb");
@@ -44,6 +47,10 @@ int main(int argc, char* argv[]) {
 	for (;;) {
 	    printf("Sending audio byte %d...\n", byte);
 	    
+	    int jitter = (rand() % 2902) - 1451;
+	    int sleeptime = 1451 + jitter;
+
+	    usleep(sleeptime);
 	    char buf[BUFSIZE];
 	    pa_usec_t latency;
 	    ssize_t r;
@@ -53,7 +60,7 @@ int main(int argc, char* argv[]) {
 		break;
 	    
 	    listening_socket.sendto(p.first, string(buf, BUFSIZE));
-	    byte += 1;
+	    byte += BUFSIZE;
 	}
 	printf("Closing connection...\n");
 	listening_socket.sendto(p.first, "eof");

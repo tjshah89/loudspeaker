@@ -191,7 +191,7 @@ static void context_state_callback(pa_context *c, void *userdata) {
             buffer_attr.tlength = (uint32_t) -1;
             buffer_attr.minreq = (uint32_t) AUDIO_PACKET_SIZE;
             buffer_attr.maxlength = (uint32_t) -1;
-            buffer_attr.prebuf = 0; // Playback should never stop in case of buffer underrun (play silence).
+            buffer_attr.prebuf = 1024; // Playback should never stop in case of buffer underrun (play silence).
             
             pa_cvolume cv;
             r = pa_stream_connect_playback(stream, NULL /* device */, &buffer_attr, (pa_stream_flags_t) flags, NULL, NULL);
@@ -316,17 +316,20 @@ int main( int argc, char *argv[] ) {
                 pair<Address, string> p = socket.recvfrom();
                 /* exit if the server closes the connection */
                 if (p.second == "eof") {
-                   return ResultType::Exit;
+		    cout << "got EOF " << endl;
+		    sleep(10);
+		    cout << "exiting " << endl;
+		    return ResultType::Exit;
                 } else {
-                   char* buf = (char*)p.second.data();
-                   writeToPlaybackBuffer(buf);
-                   fwrite(buf, sizeof(char), AUDIO_PACKET_SIZE, fd);
-                   return ResultType::Continue;
+		    char* buf = (char*)p.second.data();
+		    writeToPlaybackBuffer(buf);
+		    //fwrite(buf, sizeof(char), AUDIO_PACKET_SIZE, fd);
+		    return ResultType::Continue;
                 }
-            }
-        )
-    );
-
+	       }
+	    )
+	);
+    
     int i = 0;    
     /* run these two rules forever until it's time to quit */
     while ( true ) {
