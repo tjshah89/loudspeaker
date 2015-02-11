@@ -20,6 +20,16 @@ int main(int argc, char* argv[]) {
 	return 0;
     }
 
+    static const pa_sample_spec ss = {
+	.format = PA_SAMPLE_S16LE,
+	.rate = 44100, 
+	.channels = 2
+    };
+
+    pa_simple *s = NULL;
+    int ret = 1;
+    int error;
+
     srand(time(NULL));
 
     printf("Opening audio file...\n");
@@ -30,6 +40,7 @@ int main(int argc, char* argv[]) {
     UDPSocket listening_socket;
     listening_socket.bind( Address( "::0", argv[ 1 ] ) );
 
+    s = pa_simple_new(NULL, argv[0], PA_STREAM_PLAYBACK, NULL, "playback", &ss, NULL, NULL, &error);
 
     /* Wait for clients to connect */
     while ( true ) {
@@ -59,6 +70,7 @@ int main(int argc, char* argv[]) {
 	    if (r == 0) 
 		break;
 	    
+	    pa_simple_write(s, buf, (size_t) r, &error);
 	    listening_socket.sendto(p.first, string(buf, BUFSIZE));
 	    byte += BUFSIZE;
 	}
@@ -67,6 +79,12 @@ int main(int argc, char* argv[]) {
 
     }
 
+    pa_simple_drain(s, &error);
+    ret = 0;
+
+    if (s)
+	pa_simple_free(s);
+    
     fclose(fd);
     return EXIT_SUCCESS;
 }
