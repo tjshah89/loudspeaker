@@ -12,7 +12,8 @@
 #include "util.hh"
 #include "poller.hh"
 
-#define AUDIO_PACKET_SIZE 256
+#include "loudspeaker.hh"
+
 #define CLEAR_LINE "\x1B[K"
 
 using namespace std;
@@ -29,12 +30,6 @@ static pa_stream_flags_t flags = (pa_stream_flags_t) 0;
 static void *buffer = NULL;
 static size_t buffer_length = 0, buffer_index = 0;
 
-static const pa_sample_spec ss = {
-    .format = PA_SAMPLE_S16LE,
-    .rate = 44100, 
-    .channels = 2
-};
-
 
 /* A shortcut for terminating the application */
 static void quit(int ret) {
@@ -43,15 +38,20 @@ static void quit(int ret) {
 }
 
 
-/* Write some data to the stream */
-static void do_stream_write(size_t length) {
-    size_t l;
-    assert(length);
+/********************************************************************************
+Callback functions triggered by events on the pulseaudio stream
+********************************************************************************/
+static void stream_write_callback(pa_stream *s, size_t length, void *userdata) {
+    assert(s);
+    assert(length > 0);
+
+    if (!buffer)
+        return;
 
     if (!buffer || !buffer_length)
         return;
 
-    l = length;
+    size_t l = length;
     if (l > buffer_length)
         l = buffer_length;
 
@@ -71,40 +71,6 @@ static void do_stream_write(size_t length) {
     }
 }
 
-
-/* This is called whenever new data may be written to the stream */
-static void stream_write_callback(pa_stream *s, size_t length, void *userdata) {
-    assert(s);
-    assert(length > 0);
-
-    if (!buffer)
-        return;
-
-    do_stream_write(length);
-}
-
-
-/* This routine is called whenever the stream state changes */
-static void stream_state_callback(pa_stream *s, void *userdata) {
-    assert(s);
-
-    switch (pa_stream_get_state(s)) {
-        case PA_STREAM_CREATING:
-        case PA_STREAM_TERMINATED:
-            break;
-        case PA_STREAM_READY:
-            if (DEBUG) {
-                // Can print info about stream metrics
-            }  
-            break;
-        case PA_STREAM_FAILED:
-        default:
-            fprintf(stderr, "Stream error: %s\n", pa_strerror(pa_context_errno(pa_stream_get_context(s))));
-            quit(1);
-    }
-}
-
-
 static void stream_suspended_callback(pa_stream *s, void *userdata) {
     assert(s);
     if (DEBUG) {
@@ -113,6 +79,15 @@ static void stream_suspended_callback(pa_stream *s, void *userdata) {
         else
             fprintf(stderr, "Stream device resumed.%s \n", CLEAR_LINE);
     }
+}
+
+static void stream_moved_callback(pa_stream *s, void *userdata) {
+    assert(s);
+    if (DEBUG)
+        fprintf(stderr, "Stream moved to device %s (%u, %ssuspended).%s \n",
+            pa_stream_get_device_name(s), pa_stream_get_device_index(s),
+            pa_stream_is_suspended(s) ? "" : "not ", 
+            CLEAR_LINE);
 }
 
 static void stream_underflow_callback(pa_stream *s, void *userdata) {
@@ -133,15 +108,6 @@ static void stream_started_callback(pa_stream *s, void *userdata) {
         fprintf(stderr, "Stream started.%s \n", CLEAR_LINE);
 }
 
-static void stream_moved_callback(pa_stream *s, void *userdata) {
-    assert(s);
-    if (DEBUG)
-        fprintf(stderr, "Stream moved to device %s (%u, %ssuspended).%s \n",
-            pa_stream_get_device_name(s), pa_stream_get_device_index(s),
-            pa_stream_is_suspended(s) ? "" : "not ", 
-            CLEAR_LINE);
-}
-
 static void stream_buffer_attr_callback(pa_stream *s, void *userdata) {
     assert(s);
     if (DEBUG)
@@ -159,6 +125,7 @@ static void context_state_callback(pa_context *c, void *userdata) {
         case PA_CONTEXT_SETTING_NAME:
             break;
 
+	/* Once the Context is ready, create the playback stream */
         case PA_CONTEXT_READY: {
             int r;
             pa_buffer_attr buffer_attr;
@@ -177,7 +144,6 @@ static void context_state_callback(pa_context *c, void *userdata) {
             }
 
             // Set the stream callbacks.
-            pa_stream_set_state_callback(stream, stream_state_callback, NULL);
             pa_stream_set_write_callback(stream, stream_write_callback, NULL);
             pa_stream_set_suspended_callback(stream, stream_suspended_callback, NULL);
             pa_stream_set_moved_callback(stream, stream_moved_callback, NULL);
@@ -193,7 +159,6 @@ static void context_state_callback(pa_context *c, void *userdata) {
             buffer_attr.maxlength = (uint32_t) -1;
             buffer_attr.prebuf = 1024; // Playback should never stop in case of buffer underrun (play silence).
             
-            pa_cvolume cv;
             r = pa_stream_connect_playback(stream, NULL /* device */, &buffer_attr, (pa_stream_flags_t) flags, NULL, NULL);
             if (r < 0) {
                 fprintf(stderr, "pa_stream_connect_playback() failed: %s\n", pa_strerror(pa_context_errno(c)));
@@ -247,10 +212,10 @@ static void stream_drain_complete(pa_stream*s, int success, void *userdata) {
 
 
 /* Updates buffer with new data received from the LoudSpeaker server */
-static void writeToPlaybackBuffer(char* data) {
+static void write_to_playback_stream(char* data) {
     if (buffer) {
-        buffer = pa_xrealloc(buffer, buffer_length + AUDIO_PACKET_SIZE);
-        memcpy((uint8_t*) buffer + buffer_length, data, AUDIO_PACKET_SIZE);
+        buffer = pa_xrealloc(buffer, buffer_index + buffer_length + AUDIO_PACKET_SIZE);
+        memcpy((uint8_t*) buffer + buffer_index + buffer_length, data, AUDIO_PACKET_SIZE);
         buffer_length += AUDIO_PACKET_SIZE;
     } else {
         buffer = pa_xmalloc(AUDIO_PACKET_SIZE);
@@ -260,78 +225,74 @@ static void writeToPlaybackBuffer(char* data) {
     }
 }
 
+int init_pa_context(pa_mainloop* m){
+    int r;
+    
+    mainloop_api = pa_mainloop_get_api(m);
+    r = pa_signal_init(mainloop_api);
+    assert(r == 0);
+
+    // Create a new connection context and connect it
+    context = pa_context_new(mainloop_api, "loudspeaker_client");
+    if (!context) {
+        fprintf(stderr, "pa_context_new() failed.\n");
+        return 1;
+    }
+
+    pa_context_set_state_callback(context, context_state_callback, NULL);
+    if (pa_context_connect(context, NULL, (pa_context_flags_t) 0, NULL) < 0) {
+        fprintf(stderr, "pa_context_connect() failed: %s\n", pa_strerror(pa_context_errno(context)));
+        return 1;
+    }
+}
 
 int main( int argc, char *argv[] ) {
     if ( argc <= 4 ) {
         cerr << "Usage: " << argv[ 0 ] << " HOST PORT outfile DEBUG(0,1)" << endl;
         return EXIT_FAILURE;
     }
+    if (argc > 4) {
+        DEBUG = atoi(argv[4]);
+    }
 
-    FILE *fd; 
-    fd = fopen(argv[3], "wb");
-
-    int ret = 1, r, c;
-
-    // Set up a new main loop
     pa_mainloop* m = pa_mainloop_new();    
     if (!m) {
         fprintf(stderr, "pa_mainloop_new() failed.\n");
-        quit(1);
-    }
-    mainloop_api = pa_mainloop_get_api(m);
-    r = pa_signal_init(mainloop_api);
-    assert(r == 0);
-
-    // Create a new connection context and connect it
-    context = pa_context_new(mainloop_api, NULL /* client_name */);
-    if (!context) {
-        fprintf(stderr, "pa_context_new() failed.\n");
-        quit(1);
-    }
-    pa_context_set_state_callback(context, context_state_callback, NULL);
-    if (pa_context_connect(context, NULL, (pa_context_flags_t) 0, NULL) < 0) {
-        fprintf(stderr, "pa_context_connect() failed: %s\n", pa_strerror(pa_context_errno(context)));
-        quit(1);
+        return 1;
     }
 
+    int init_pa = init_pa_context(m);
+    if (init_pa){
+	quit(1);
+    }
 
     string host { argv[ 1 ] }, port { argv[ 2 ] };
     Address server( host, port );
 
-    if (argc == 5) {
-        DEBUG = atoi(argv[4]);
-    }
-
     UDPSocket socket;
     socket.connect( server );
 
-    socket.write("Hi!!\n");
+    socket.write("Connect Request");
     /* now read and write from the server using an event-driven "poller" */
     Poller poller;
-    /* first rule: if the socket has data ready (in the "In" direction),
-       print it to the screen (cout) */
-    poller.add_action(
-        Action(socket, Direction::In,
-            [&] () {
-                pair<Address, string> p = socket.recvfrom();
+    poller.add_action(Action(socket, Direction::In, [&] () {
+                pair<Address, string> packet = socket.recvfrom();
+		string data = packet.second;
+
                 /* exit if the server closes the connection */
-                if (p.second == "eof") {
-		    cout << "got EOF " << endl;
-		    sleep(10);
-		    cout << "exiting " << endl;
+                if (data == "EOF") {
+		    printf("Received EOF from server\n");
 		    return ResultType::Exit;
                 } else {
-		    char* buf = (char*)p.second.data();
-		    writeToPlaybackBuffer(buf);
-		    //fwrite(buf, sizeof(char), AUDIO_PACKET_SIZE, fd);
+		    char* buf = (char*)data.data();
+		    write_to_playback_stream(buf);
 		    return ResultType::Continue;
                 }
-	       }
-	    )
+	    })
 	);
     
-    int i = 0;    
     /* run these two rules forever until it's time to quit */
+    int ret = 1;
     while ( true ) {
         const auto retrn = poller.poll( -1 );
 
@@ -355,6 +316,5 @@ int main( int argc, char *argv[] ) {
         pa_signal_done();
         pa_mainloop_free(m);
     }
-    fclose(fd);
     return ret;
 }

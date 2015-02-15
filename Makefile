@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS= -std=c++11 -I sourdough/src/ 
+CFLAGS= -std=c++11 -I sourdough/src/ -g 
 LIBS = -lpulse -lpulse-simple -lpthread -L sourdough/src/
 SOURDOUGH =  sourdough/src/libsourdough.a
 
