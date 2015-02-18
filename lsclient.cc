@@ -25,7 +25,7 @@ static pa_stream *stream = NULL;
 static pa_mainloop_api *mainloop_api = NULL;
 static int DEBUG = 0;
 
-static pa_stream_flags_t flags = (pa_stream_flags_t) 0;
+static int flags = 0;
 
 static void *buffer = NULL;
 static size_t buffer_length = 0, buffer_index = 0;
@@ -155,9 +155,10 @@ static void context_state_callback(pa_context *c, void *userdata) {
             // Set the playback buffer attributes.
             memset(&buffer_attr, 0, sizeof(buffer_attr));
             buffer_attr.tlength = (uint32_t) -1;
-            buffer_attr.minreq = (uint32_t) AUDIO_PACKET_SIZE;
+            buffer_attr.minreq = (uint32_t) -1;
             buffer_attr.maxlength = (uint32_t) -1;
-            buffer_attr.prebuf = 1024; // Playback should never stop in case of buffer underrun (play silence).
+            buffer_attr.prebuf = (uint32_t) 1024; // Playback should never stop in case of buffer underrun (play silence)
+	    flags |= PA_STREAM_ADJUST_LATENCY;
             
             r = pa_stream_connect_playback(stream, NULL /* device */, &buffer_attr, (pa_stream_flags_t) flags, NULL, NULL);
             if (r < 0) {
