@@ -182,36 +182,6 @@ static void context_state_callback(pa_context *c, void *userdata) {
     return;
 }
 
-
-/* Connection draining complete */
-static void context_drain_complete(pa_context*c, void *userdata) {
-    pa_context_disconnect(c);
-}
-
-
-/* Stream draining complete */
-static void stream_drain_complete(pa_stream*s, int success, void *userdata) {
-    if (!success) {
-        fprintf(stderr, "Failed to drain stream: %s\n", pa_strerror(pa_context_errno(context)));
-        quit(1);
-    }
-
-    if (DEBUG)
-        fprintf(stderr, "Playback stream drained.\n");
-
-    pa_stream_disconnect(stream);
-    pa_stream_unref(stream);
-    stream = NULL;
-
-    if (!pa_context_drain(context, context_drain_complete, NULL))
-        pa_context_disconnect(context);
-    else {
-        if (DEBUG)
-            fprintf(stderr, "Draining connection to server.\n");
-    }
-}
-
-
 /* Updates buffer with new data received from the LoudSpeaker server */
 static void write_to_playback_stream(char* data) {
     if (buffer) {
