@@ -24,7 +24,7 @@ using namespace std;
 using namespace PollerShortNames;
 
 static void *buffer = NULL;
-static size_t buffer_length = 0, buffer_index = 0;
+static size_t data_start = 0, data_end = 0;
 
 static pa_context *context = NULL;
 static pa_stream *stream = NULL;
@@ -74,17 +74,23 @@ static void stream_read_callback(pa_stream *s, size_t length, void *userdata) {
 
     assert(data);
     assert(length > 0);
+    assert(buffer);
 
-    if (buffer) {
-        buffer = pa_xrealloc(buffer, buffer_index + buffer_length + length);
-        //buffer_index = 0;
-        memcpy((uint8_t*) buffer + buffer_index, data, length);
-        buffer_length += length;
-    } else {
-        buffer = pa_xmalloc(length);
-        memcpy(buffer, data, length);
-        buffer_length = length;
-        buffer_index = 0;
+    //this is dropping some audio data, may want to revisit this.
+    if ( data_end < data_start ) {
+	if ( length > data_start - data_end ) 
+	    length = data_start - data_end;
+
+    }	    
+    else if ( length > BUFFER_LENGTH - data_end ) {
+	length = BUFFER_LENGTH - data_end;
+    }
+
+    memcpy((uint8_t*) buffer + data_end, data, length);
+    data_end += length;
+
+    if ( data_end == BUFFER_LENGTH ) {
+	data_end = 0;
     }
 
     pa_stream_drop(s);
@@ -176,11 +182,13 @@ static void context_state_callback(pa_context *c, void *userdata) {
             memset(&buffer_attr, 0, sizeof(buffer_attr));
             buffer_attr.tlength = (uint32_t) -1;
             buffer_attr.minreq = (uint32_t) -1;
-            buffer_attr.fragsize = (uint32_t) -1;
+            buffer_attr.fragsize = (uint32_t) 256;
             buffer_attr.maxlength = (uint32_t) -1;
             buffer_attr.prebuf = (uint32_t) -1; // Playback should never stop in case of buffer underrun (play silence).
-            
-            r = pa_stream_connect_record(stream, NULL /* device */, NULL /*&buffer_attr*/, (pa_stream_flags_t) flags);
+
+	    flags = (pa_stream_flags_t)PA_STREAM_ADJUST_LATENCY;
+
+            r = pa_stream_connect_record(stream, NULL /* device */, &buffer_attr, (pa_stream_flags_t) flags);
             if (r < 0) {
                 fprintf(stderr, "pa_stream_connect_playback() failed: %s\n", pa_strerror(pa_context_errno(c)));
                 quit(1);
@@ -223,29 +231,28 @@ int init_pa_context(pa_mainloop* m){
     }
 }
 
-static void read_from_recording_buffer(char* outBuffer, pa_simple *pbStream) {
+static int read_from_recording_buffer(char* outBuffer, pa_simple *pbStream) {
     int error;
     if (!buffer)
-        return;
+        return 0;
 
-    if (!buffer || !buffer_length)
-        return;
+    if ( data_end < data_start ) {
+	if ( BUFFER_LENGTH - data_start < AUDIO_PACKET_SIZE ) {
+	    data_start = 0;
+	    if ( data_end < AUDIO_PACKET_SIZE ) {
+		return 0;
+	    }
+	}
+    }
+    else if ( data_end - data_start < AUDIO_PACKET_SIZE )
+    	return 0;
 
-    if (AUDIO_PACKET_SIZE > buffer_length)
-    	return;
-
-    memcpy(outBuffer, (uint8_t *)buffer + buffer_index, AUDIO_PACKET_SIZE); 
-
+    memcpy(outBuffer, (uint8_t *)buffer + data_start, AUDIO_PACKET_SIZE); 
+    
     //pa_simple_write(pbStream, outBuffer, (size_t) AUDIO_PACKET_SIZE, &error);
 
-    buffer_length -= AUDIO_PACKET_SIZE; 
-    buffer_index += AUDIO_PACKET_SIZE;
-
-    if (!buffer_length) {
-        pa_xfree(buffer);
-        buffer = NULL;
-        buffer_index = buffer_length = 0;
-    }
+    data_start += AUDIO_PACKET_SIZE;
+    return AUDIO_PACKET_SIZE;
 }
 
 int main(int argc, char* argv[]) {
@@ -257,6 +264,11 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         DEBUG = atoi(argv[2]);
     }
+
+    data_start = 0;
+    data_end = 0;
+    buffer = malloc(BUFFER_LENGTH);
+
     srand(time(NULL));
     pa_simple *s = NULL;
     pa_simple *pbStream = NULL;
@@ -304,9 +316,6 @@ int main(int argc, char* argv[]) {
 	    if ( i%256 == 0)
 		const auto retrn = poller.poll( 1 );
 	
-	    if (DEBUG)
-		printf("Sending audio byte %d...\n", byte);
-		    
 	    char buf[AUDIO_PACKET_SIZE];
 	    pa_usec_t latency;
 	    ssize_t r;
@@ -318,16 +327,20 @@ int main(int argc, char* argv[]) {
 	    }
 	    
 	    /* Stage some data to be sent */
-	    read_from_recording_buffer(buf, pbStream);
-
-	    //print_time("Sending audio");
-	    for (vector<Address>::iterator client = clients.begin(); client != clients.end(); ++client) {
+	    if ( read_from_recording_buffer(buf, pbStream)) {
 		if (DEBUG)
-		    printf("Sending to: %s:%d\n", (*client).ip().c_str(), (*client).port());
+		    printf("Sending audio byte %d...\n", byte);
+		    
 
-		listening_socket.sendto(*client, string(buf, AUDIO_PACKET_SIZE));
+		//print_time("Sending audio");
+		for (vector<Address>::iterator client = clients.begin(); client != clients.end(); ++client) {
+		    if (DEBUG)
+			printf("Sending to: %s:%d\n", (*client).ip().c_str(), (*client).port());
+		    
+		    listening_socket.sendto(*client, string(buf, AUDIO_PACKET_SIZE));
+		}
+		byte += AUDIO_PACKET_SIZE;
 	    }
-	    byte += AUDIO_PACKET_SIZE;
 	    i++;
 	}
 
@@ -340,6 +353,8 @@ int main(int argc, char* argv[]) {
 	if (s)
 	    pa_simple_free(s);
     }
+    if(buffer)
+	free(buffer);
 
     return EXIT_SUCCESS;
 }

@@ -28,7 +28,7 @@ static int DEBUG = 0;
 static int flags = 0;
 
 static void *buffer = NULL;
-static size_t buffer_length = 0, buffer_index = 0;
+static size_t data_start = 0, data_end = 0;
 
 
 /* A shortcut for terminating the application */
@@ -48,26 +48,24 @@ static void stream_write_callback(pa_stream *s, size_t length, void *userdata) {
     if (!buffer)
         return;
 
-    if (!buffer || !buffer_length)
-        return;
+    if ( data_end < data_start ) {
+	length = BUFFER_LENGTH - data_start;
+    }
+    else if ( data_end - data_start < length) {
+	length = data_end - data_start;
+    }
 
-    size_t l = length;
-    if (l > buffer_length)
-        l = buffer_length;
-
-    if (pa_stream_write(stream, (uint8_t*) buffer + buffer_index, l, NULL, 0, PA_SEEK_RELATIVE) < 0) {
+    if (pa_stream_write(stream, (uint8_t*) buffer + data_start, length, NULL, 0, PA_SEEK_RELATIVE) < 0) {
         fprintf(stderr, "pa_stream_write() failed: %s\n", pa_strerror(pa_context_errno(context)));
         quit(1);
         return;
     }
 
-    buffer_length -= l;
-    buffer_index += l;
-
-    if (!buffer_length) {
-        pa_xfree(buffer);
-        buffer = NULL;
-        buffer_index = buffer_length = 0;
+    data_start += length;
+    if ( data_start == BUFFER_LENGTH ) {
+	if (DEBUG)
+	    printf("wrapping start, value was %d\n", (int) data_start);
+	data_start = 0;
     }
 }
 
@@ -157,7 +155,7 @@ static void context_state_callback(pa_context *c, void *userdata) {
         buffer_attr.tlength = (uint32_t) -1;
         buffer_attr.minreq = (uint32_t) -1;
         buffer_attr.maxlength = (uint32_t) -1;
-        buffer_attr.prebuf = (uint32_t) 1024; // Playback should never stop in case of buffer underrun (play silence)
+        buffer_attr.prebuf = (uint32_t) 256; // Playback should never stop in case of buffer underrun (play silence)
         flags |= PA_STREAM_ADJUST_LATENCY;
             
         r = pa_stream_connect_playback(stream, NULL /* device */, &buffer_attr, (pa_stream_flags_t) flags, NULL, NULL);
@@ -184,16 +182,15 @@ static void context_state_callback(pa_context *c, void *userdata) {
 
 /* Updates buffer with new data received from the LoudSpeaker server */
 static void write_to_playback_stream(char* data) {
-    if (buffer) {
-        buffer = pa_xrealloc(buffer, buffer_index + buffer_length + AUDIO_PACKET_SIZE);
-        memcpy((uint8_t*) buffer + buffer_index + buffer_length, data, AUDIO_PACKET_SIZE);
-        buffer_length += AUDIO_PACKET_SIZE;
-    } else {
-        buffer = pa_xmalloc(AUDIO_PACKET_SIZE);
-        memcpy(buffer, data, AUDIO_PACKET_SIZE);
-        buffer_length = AUDIO_PACKET_SIZE;
-        buffer_index = 0;
+    if ( BUFFER_LENGTH - data_end < AUDIO_PACKET_SIZE ) {
+	if (DEBUG)
+	    printf("Wrapping buffer, space used was %d, start is %d\n", (int) (data_end), (int) data_start);
+	data_end = 0;
     }
+
+    memcpy((uint8_t*) buffer + data_end, data, AUDIO_PACKET_SIZE);
+
+    data_end += AUDIO_PACKET_SIZE;
 }
 
 int init_pa_context(pa_mainloop* m){
@@ -225,6 +222,10 @@ int main( int argc, char *argv[] ) {
     if (argc > 3) {
         DEBUG = atoi(argv[3]);
     }
+
+    data_start = 0;
+    data_end = 0;
+    buffer = malloc(BUFFER_LENGTH);
 
     pa_mainloop* m = pa_mainloop_new();    
     if (!m) {
@@ -287,5 +288,9 @@ int main( int argc, char *argv[] ) {
         pa_signal_done();
         pa_mainloop_free(m);
     }
+    if(buffer)
+	free(buffer);
+    
     return ret;
 }
+
