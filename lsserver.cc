@@ -60,7 +60,7 @@ static void quit(int ret) {
 ********************************************************************************/
 
 /* This is called whenever new recorded data is available so that we can pass
- it into "buffer" to be later read and sent to the clients. */
+  it into "buffer" to be later read and sent to the clients. */
 static void stream_read_callback(pa_stream *s, size_t length, void *userdata) {
     const void *data;
     assert(s);
@@ -223,40 +223,6 @@ int init_pa_context(pa_mainloop* m){
     }
 }
 
-
-// /* This is called whenever new recorded data is available so that we can pass
-//    it into "buffer" to be later read and sent to the clients. */
-// static void record_from_mic(pa_simple *s, pa_simple *pbStream) {
-//     print_time("\n");
-//     print_time("==================================================================");
-//     print_time("-------------------------Start record_from_mic");
-//     int error;
-//     int sampleLength = 256;
-//     char* buf[sampleLength];
-//     assert(s);
-//     print_time("Read from mic");
-//     if (pa_simple_read(s, buf, sampleLength, &error) < 0) {
-// 	fprintf(stderr, __FILE__": pa_simple_read() failed: %s\n", pa_strerror(error));
-//     }
-
-//     //pa_simple_write(pbStream, buf, (size_t) sampleLength, &error);
-
-//     print_time("Write from buf to buffer");
-//     if (buffer) {
-//         buffer = pa_xrealloc(buffer, buffer_length + sampleLength);
-// 	buffer_index = 0;
-//         memcpy((uint8_t*) buffer + buffer_length, buf, sampleLength);
-//         buffer_length += sampleLength;
-//     } else {
-//         buffer = pa_xmalloc(sampleLength);
-//         memcpy(buffer, buf, sampleLength);
-//         buffer_length = sampleLength;
-//         buffer_index = 0;
-//     }
-//     print_time("-------------------------End record_from_mic");
-// }
-
-
 static void read_from_recording_buffer(char* outBuffer, pa_simple *pbStream) {
     int error;
     if (!buffer)
@@ -281,7 +247,6 @@ static void read_from_recording_buffer(char* outBuffer, pa_simple *pbStream) {
         buffer_index = buffer_length = 0;
     }
 }
-
 
 int main(int argc, char* argv[]) {
 
@@ -376,7 +341,6 @@ int main(int argc, char* argv[]) {
 	    pa_simple_free(s);
     }
 
-    //fclose(fd);
     return EXIT_SUCCESS;
 }
      
