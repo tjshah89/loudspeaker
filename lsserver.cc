@@ -182,7 +182,7 @@ static void context_state_callback(pa_context *c, void *userdata) {
             memset(&buffer_attr, 0, sizeof(buffer_attr));
             buffer_attr.tlength = (uint32_t) -1;
             buffer_attr.minreq = (uint32_t) -1;
-            buffer_attr.fragsize = (uint32_t) 256;
+            buffer_attr.fragsize = (uint32_t) AUDIO_PACKET_SIZE;
             buffer_attr.maxlength = (uint32_t) -1;
             buffer_attr.prebuf = (uint32_t) -1; // Playback should never stop in case of buffer underrun (play silence).
 

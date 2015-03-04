@@ -2,7 +2,7 @@
 #include <stdlib.h> 
 #include <string.h>
 
-#define AUDIO_PACKET_SIZE 256
+#define AUDIO_PACKET_SIZE 64
 #define BUFFER_LENGTH AUDIO_PACKET_SIZE * 2048
 
 static const pa_sample_spec ss = {
