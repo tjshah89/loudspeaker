@@ -216,11 +216,16 @@ int init_pa_context(pa_mainloop* m){
 
 int main( int argc, char *argv[] ) {
     if ( argc < 3 ) {
-        cerr << "Usage: " << argv[ 0 ] << " HOST PORT DEBUG(0,1)" << endl;
+        cerr << "Usage: " << argv[ 0 ] << " HOST PORT packet_size DEBUG(0,1)" << endl;
         return EXIT_FAILURE;
     }
+
     if (argc > 3) {
-        DEBUG = atoi(argv[3]);
+	AUDIO_PACKET_SIZE = atoi(argv[3]);
+    }
+    
+    if (argc > 4) {
+        DEBUG = atoi(argv[4]);
     }
 
     data_start = 0;

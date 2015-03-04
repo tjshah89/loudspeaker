@@ -258,11 +258,16 @@ static int read_from_recording_buffer(char* outBuffer, pa_simple *pbStream) {
 int main(int argc, char* argv[]) {
 
     if (argc < 2) {
-	printf("Usage: ./lsserver <localport> DEBUG(0,1)\n");
+	printf("Usage: ./lsserver <localport> packet_size DEBUG(0,1)\n");
 	return 0;
     }
+
     if (argc > 2) {
-        DEBUG = atoi(argv[2]);
+        AUDIO_PACKET_SIZE = atoi(argv[2]);
+    }
+
+    if (argc > 3) {
+        DEBUG = atoi(argv[3]);
     }
 
     data_start = 0;
