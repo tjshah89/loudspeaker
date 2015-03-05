@@ -33,6 +33,8 @@ static int DEBUG = 0;
 
 static pa_stream_flags_t flags = (pa_stream_flags_t) 0;
 
+static int frag_size = 256;
+
 struct timeval *tval_start = NULL;
 struct timeval *tval_last = NULL;
 
@@ -52,6 +54,8 @@ static void print_time(const string message) {
 static void quit(int ret) {
     assert(mainloop_api);
     mainloop_api->quit(mainloop_api, ret);
+    if(buffer)
+	free(buffer);
 }
 
 
@@ -92,7 +96,7 @@ static void stream_read_callback(pa_stream *s, size_t length, void *userdata) {
     if ( data_end == BUFFER_LENGTH ) {
 	data_end = 0;
     }
-
+    print_time("got audio from server\n");
     pa_stream_drop(s);
 }
 
@@ -182,7 +186,7 @@ static void context_state_callback(pa_context *c, void *userdata) {
             memset(&buffer_attr, 0, sizeof(buffer_attr));
             buffer_attr.tlength = (uint32_t) -1;
             buffer_attr.minreq = (uint32_t) -1;
-            buffer_attr.fragsize = (uint32_t) AUDIO_PACKET_SIZE;
+            buffer_attr.fragsize = (uint32_t) frag_size;
             buffer_attr.maxlength = (uint32_t) -1;
             buffer_attr.prebuf = (uint32_t) -1; // Playback should never stop in case of buffer underrun (play silence).
 
@@ -256,18 +260,33 @@ static int read_from_recording_buffer(char* outBuffer, pa_simple *pbStream) {
 }
 
 int main(int argc, char* argv[]) {
+    signal(SIGINT, quit);
 
     if (argc < 2) {
-	printf("Usage: ./lsserver <localport> packet_size DEBUG(0,1)\n");
+	fprintf(stderr, "Usage: %s HOST PORT -d:debug -p:packet_size -f:frag_size\n", argv[0]);
 	return 0;
     }
+    string port { argv[ 1 ] };
 
-    if (argc > 2) {
-        AUDIO_PACKET_SIZE = atoi(argv[2]);
-    }
-
-    if (argc > 3) {
-        DEBUG = atoi(argv[3]);
+    int c;
+    while ((c = getopt(argc, argv, "dp:f:")) != -1) {
+	switch (c) {
+	case 'd':
+	    DEBUG = 1;
+	    break;
+	case 'p':
+	    AUDIO_PACKET_SIZE = atoi(optarg);
+	    break;
+	case 'f':
+	    frag_size = atoi(optarg);
+	    break;
+	case '?':
+	    fprintf(stderr, "Usage: %s HOST PORT -d:debug -p:packet_size -f:frag_size\n", argv[0]);
+	    return 1;
+	default:
+	    abort();
+	}
+	
     }
 
     data_start = 0;
@@ -295,7 +314,7 @@ int main(int argc, char* argv[]) {
 
     //print_time("Creating listening socket...");
     UDPSocket listening_socket;
-    listening_socket.bind( Address( "::0", argv[ 1 ] ) );
+    listening_socket.bind( Address( "::0", port ) );
 
     vector<Address> clients;
     Poller poller;
