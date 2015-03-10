@@ -12,9 +12,9 @@
 #include <pulse/simple.h>
 #include <pulse/pulseaudio.h>
 
-#include "socket.hh"
-#include "util.hh"
-#include "poller.hh"
+#include "sourdough/src/socket.hh"
+#include "sourdough/src/util.hh"
+#include "sourdough/src/poller.hh"
 
 #include "loudspeaker.hh"
 
@@ -281,7 +281,7 @@ int main(int argc, char* argv[]) {
 	    frag_size = atoi(optarg);
 	    break;
 	case '?':
-	    fprintf(stderr, "Usage: %s HOST PORT -d:debug -p:packet_size -f:frag_size\n", argv[0]);
+	    fprintf(stderr, "Usage: %s PORT -d:debug -p:packet_size -f:frag_size\n", argv[0]);
 	    return 1;
 	default:
 	    abort();

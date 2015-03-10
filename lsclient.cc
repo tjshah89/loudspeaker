@@ -10,9 +10,9 @@
 #include <pulse/simple.h>
 #include <pulse/pulseaudio.h>
 
-#include "socket.hh"
-#include "util.hh"
-#include "poller.hh"
+#include "sourdough/src/socket.hh"
+#include "sourdough/src/util.hh"
+#include "sourdough/src/poller.hh"
 
 #include "loudspeaker.hh"
 
