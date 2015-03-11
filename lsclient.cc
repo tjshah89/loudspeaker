@@ -305,7 +305,6 @@ int main( int argc, char *argv[] ) {
 
     UDPSocket socket;
     socket.connect( server );
-    fprintf(stderr, "Usage: %s HOST PORT <arguments>\n", argv[0]);
 
     socket.write("Connect Request");
     /* now read and write from the server using an event-driven "poller" */
