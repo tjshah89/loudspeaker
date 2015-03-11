@@ -96,7 +96,8 @@ static void stream_read_callback(pa_stream *s, size_t length, void *userdata) {
     if ( data_end == BUFFER_LENGTH ) {
 	data_end = 0;
     }
-    print_time("got audio from server\n");
+    if (DEBUG)
+        print_time("got audio from server\n");
     pa_stream_drop(s);
 }
 

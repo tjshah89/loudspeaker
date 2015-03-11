@@ -96,8 +96,10 @@ static void stream_write_callback(pa_stream *s, size_t length, void *userdata) {
         return;
     }
 
-    print_time("wrote audio to server\n");
-    printf("wrote %d bytes, data_end:%d, start is %d\n", (int) length, (int) (data_end), (int) data_start);
+    if (DEBUG) {
+        print_time("wrote audio to server\n");
+        printf("wrote %d bytes, data_end:%d, start is %d\n", (int) length, (int) (data_end), (int) data_start);
+    }
 
     data_start = data_end;
 }
